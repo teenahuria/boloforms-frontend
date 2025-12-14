@@ -1,0 +1,25 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.editor-container {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  border-right: 1px solid #ddd;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.pdf-container {
+  flex: 1;
+  overflow: auto;
+  background: #f2f2f2;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
