@@ -153,7 +153,23 @@ export default function Editor() {
 
     try {
         // FIX: Use process.env.REACT_APP_API_URL and provide a robust fallback
+        // Inside Editor.jsx, around line 159, replace this block:
+/*
         const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        const API_URL = `${API_BASE_URL}/sign-pdf`;
+*/
+
+// With this corrected, robust version:
+        // FIX: Remove the hardcoded fallback which breaks the Render deployment.
+        // We will now rely ONLY on the environment variable set in Render.
+        const API_BASE_URL = process.env.REACT_APP_API_URL;
+        
+        if (!API_BASE_URL) {
+            // This check prevents deployment failure and forces use of the variable.
+            alert("Configuration Error: API_BASE_URL is missing. Cannot submit.");
+            throw new Error("API_BASE_URL is not configured.");
+        }
+        
         const API_URL = `${API_BASE_URL}/sign-pdf`;
         
       const response = await fetch(API_URL, {
