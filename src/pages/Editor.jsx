@@ -112,17 +112,17 @@ export default function Editor() {
     );
     if (!signatureBase64Prompt) return;
 
-    // CRITICAL FIX FOR INVISIBLE SIGNATURES: Prepend Data URI Scheme
-    const PREFIX = 'data:image/png;base64,';
-    const signatureBase64 = signatureBase64Prompt.startsWith(PREFIX) 
-        ? signatureBase64Prompt 
-        : PREFIX + signatureBase64Prompt;
+    // CRITICAL FIX FOR INVISIBLE SIGNATURES: Prepend Data URI Scheme
+    const PREFIX = 'data:image/png;base64,';
+    const signatureBase64 = signatureBase64Prompt.startsWith(PREFIX) 
+        ? signatureBase64Prompt 
+        : PREFIX + signatureBase64Prompt;
 
-    // CRITICAL DEBUG CHECK 1: Check if the field has any size
-    if (signatureField.width === 0 || signatureField.height === 0) {
-        alert("The signature field has zero width or height. Please resize the box before submitting.");
-        return;
-    }
+    // CRITICAL DEBUG CHECK 1: Check if the field has any size
+    if (signatureField.width === 0 || signatureField.height === 0) {
+        alert("The signature field has zero width or height. Please resize the box before submitting.");
+        return;
+    }
 
 
     const newWindow = window.open("", "_blank");
@@ -130,13 +130,13 @@ export default function Editor() {
       newWindow.document.title = "Processing Document...";
       // DEBUG CHECK 2: Display the Base64 image in the new window for immediate verification
       newWindow.document.body.innerHTML = `
-            <h1>Signing in Progress... Please Wait.</h1>
-            <h2>Verifying Signature Data...</h2>
-            <img src="${signatureBase64}" alt="Signature Preview" style="max-width: 300px; border: 1px solid #ccc;"/>
-            <p>If the image above is blank, your pasted Base64 string is invalid or incomplete.</p>
-        `;
+            <h1>Signing in Progress... Please Wait.</h1>
+            <h2>Verifying Signature Data...</h2>
+            <img src="${signatureBase64}" alt="Signature Preview" style="max-width: 300px; border: 1px solid #ccc;"/>
+            <p>If the image above is blank, your pasted Base64 string is invalid or incomplete.</p>
+        `;
     }
-    
+    
     const payload = {
       pdfId: "document-123",
       signatureBase64: signatureBase64, // <-- Using the correctly prefixed variable
@@ -152,26 +152,24 @@ export default function Editor() {
     };
 
     try {
-        // FIX: Use process.env.REACT_APP_API_URL and provide a robust fallback
-        // Inside Editor.jsx, around line 159, replace this block:
-/*
-        const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// --------------------------------------------------------------------------------------------------
+// CRITICAL FIX SECTION: Changing the API URL variable to VITE_API_URL
+// --------------------------------------------------------------------------------------------------
+        // We must use import.meta.env.VITE_API_URL to match the variable correctly set on Render.
+        // We also ensure the obsolete process.env.REACT_APP_API_URL (which was incorrectly set) is not used.
+        
+        const API_BASE_URL = import.meta.env.VITE_API_URL;
+        
+        if (!API_BASE_URL) {
+            // This check prevents the browser from trying to call an undefined address.
+            alert("Configuration Error: VITE_API_URL is missing. Cannot submit.");
+            throw new Error("VITE_API_URL is not configured in the deployment settings.");
+        }
+        
         const API_URL = `${API_BASE_URL}/sign-pdf`;
-*/
-
-// With this corrected, robust version:
-        // FIX: Remove the hardcoded fallback which breaks the Render deployment.
-        // We will now rely ONLY on the environment variable set in Render.
-        const API_BASE_URL = process.env.REACT_APP_API_URL;
-        
-        if (!API_BASE_URL) {
-            // This check prevents deployment failure and forces use of the variable.
-            alert("Configuration Error: API_BASE_URL is missing. Cannot submit.");
-            throw new Error("API_BASE_URL is not configured.");
-        }
-        // Forcing deployment update
-        
-        const API_URL = `${API_BASE_URL}/sign-pdf`;
+// --------------------------------------------------------------------------------------------------
+// END CRITICAL FIX SECTION
+// --------------------------------------------------------------------------------------------------
         
       const response = await fetch(API_URL, {
         method: "POST",
