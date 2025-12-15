@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback } from "react";
 import PdfViewer from "../components/PdfViewer";
 import Sidebar from "../components/Sidebar";
-import { calculateRelativeCoords } from "../utils/coordinateMath";
-// Note: Vite exposes environment variables via import.meta.env
+// FIX: Import the necessary functions from the coordinate utility file
+import { calculateRelativeCoords, calculatePixelCoordsForRender } from "../utils/coordinateMath"; 
+import FieldWrapper from '../components/FieldWrapper'; 
+// Note: This file uses Create React App (CRA) standards (process.env.REACT_APP_)
 
 export default function Editor() {
   const [fields, setFields] = useState([]);
@@ -59,35 +61,41 @@ export default function Editor() {
   const handleDrop = useCallback(
     (e) => {
       e.preventDefault();
+      
       const type = e.dataTransfer.getData("field/type");
-      const pageContainer = pdfContainerRef.current;
-      // Get the parent div which is set to overflow: 'auto' (the scrollable area)
-      const scrollableParent = pageContainer
-        ? pageContainer.parentElement
-        : null;
+      if (!type) {
+        console.error("Drag data (field/type) is missing. Check Sidebar dragStart.");
+        return;
+      }
 
+      const pageContainer = pdfContainerRef.current;
+      
+      // FIX 1: Get the scrollable container (the drop target) using e.currentTarget.
+      const scrollableParent = e.currentTarget; 
+
+      // CRITICAL GUARD: Stop if the container is not ready (although PDF load success should cover this)
       if (!pageContainer || !scrollableParent) {
         console.error(
           "PDF Container or Scrollable Parent Ref is missing. Cannot calculate drop coordinates."
         );
         return;
       }
+
       const rect = pageContainer.getBoundingClientRect();
 
-      // CRITICAL FIX FOR RESPONSIVENESS: Capture the current scroll offset
+      // FIX 2: Capture the current scroll offset
       const pixelScrollY = scrollableParent.scrollTop;
-
+      
       const initialPixelData = {
         pixelX: e.clientX - rect.left,
-        // FIX: Add the scroll offset to the drop position. (Already in your code, confirmed correct)
+        // FINAL Y FIX: e.clientY (mouse pos in viewport) - rect.top (PDF top in viewport) + scroll position (how far down we are)
+        // This creates the definitive Y-position relative to the absolute top of the document.
         pixelY: e.clientY - rect.top + pixelScrollY, 
         pixelWidth: 100, // Default width
         pixelHeight: 30, // Default height
       };
 
-      if (type) {
-        addField(type, initialPixelData);
-      }
+      addField(type, initialPixelData); 
     },
     [addField]
   );
@@ -99,20 +107,39 @@ export default function Editor() {
       return;
     }
 
-    const signatureBase64 = prompt(
-      "Paste your signature image Base64 string here:"
+    const signatureBase64Prompt = prompt(
+      "Paste your signature image Base64 string here (e.g., QkFIRkJ...):"
     );
-    if (!signatureBase64) return;
+    if (!signatureBase64Prompt) return;
+
+    // CRITICAL FIX FOR INVISIBLE SIGNATURES: Prepend Data URI Scheme
+    const PREFIX = 'data:image/png;base64,';
+    const signatureBase64 = signatureBase64Prompt.startsWith(PREFIX) 
+        ? signatureBase64Prompt 
+        : PREFIX + signatureBase64Prompt;
+
+    // CRITICAL DEBUG CHECK 1: Check if the field has any size
+    if (signatureField.width === 0 || signatureField.height === 0) {
+        alert("The signature field has zero width or height. Please resize the box before submitting.");
+        return;
+    }
+
 
     const newWindow = window.open("", "_blank");
     if (newWindow) {
       newWindow.document.title = "Processing Document...";
-      newWindow.document.body.innerHTML =
-        "<h1>Signing in Progress... Please Wait.</h1>";
+      // DEBUG CHECK 2: Display the Base64 image in the new window for immediate verification
+      newWindow.document.body.innerHTML = `
+            <h1>Signing in Progress... Please Wait.</h1>
+            <h2>Verifying Signature Data...</h2>
+            <img src="${signatureBase64}" alt="Signature Preview" style="max-width: 300px; border: 1px solid #ccc;"/>
+            <p>If the image above is blank, your pasted Base64 string is invalid or incomplete.</p>
+        `;
     }
+    
     const payload = {
       pdfId: "document-123",
-      signatureBase64: signatureBase64,
+      signatureBase64: signatureBase64, // <-- Using the correctly prefixed variable
       fieldData: {
         type: signatureField.type,
         page: signatureField.page,
@@ -125,12 +152,10 @@ export default function Editor() {
     };
 
     try {
-        // FIX FOR SYNTAX ERROR: Safely define the base URL variable here.
-        // This is necessary because import.meta is not always available at the global scope.
-        // Also includes fallback for safer local debugging.
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const API_URL = `${API_BASE_URL}/sign-pdf`;
-        
+        // FIX: Use process.env.REACT_APP_API_URL and provide a robust fallback
+        const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        const API_URL = `${API_BASE_URL}/sign-pdf`;
+        
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,12 +200,28 @@ export default function Editor() {
         <PdfViewer
           pdfContainerRef={pdfContainerRef}
           onLoadSuccess={handlePdfLoadSuccess}
-          fields={fields}
+          // Fields are no longer passed here
           pdfDimensions={pdfDimensions}
           onFieldUpdate={updateField}
         />
-      </div>
-      <button
+
+        {/* CRITICAL FIX: Conditionally render fields ONLY after PDF dimensions are set */}
+        {pdfDimensions.width > 0 && fields.map(field => {
+            const { pixelX, pixelY, pixelWidth, pixelHeight } = calculatePixelCoordsForRender(field, pdfDimensions);
+            return (
+                <FieldWrapper
+                    key={field.id}
+                    field={field}
+                    pixelX={pixelX}
+                    pixelY={pixelY}
+                    pixelWidth={pixelWidth}
+                    pixelHeight={pixelHeight}
+                    pdfDimensions={pdfDimensions}
+                    onUpdate={updateField}
+                />
+            );
+        })}
+      </div> <button 
         onClick={handleSignDocument}
         style={{
           position: "fixed",
