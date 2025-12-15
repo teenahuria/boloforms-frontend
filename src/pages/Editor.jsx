@@ -5,201 +5,199 @@ import { calculateRelativeCoords } from "../utils/coordinateMath";
 // Note: Vite exposes environment variables via import.meta.env
 
 export default function Editor() {
-  const [fields, setFields] = useState([]);
-  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
-  const pdfContainerRef = useRef(null);
+  const [fields, setFields] = useState([]);
+  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
+  const pdfContainerRef = useRef(null);
 
-  const handlePdfLoadSuccess = useCallback((page) => {
-    setPdfDimensions({
-      width: page.width,
-      height: page.height, // Total rendered height of PDF
-    });
-  }, []);
+  const handlePdfLoadSuccess = useCallback((page) => {
+    setPdfDimensions({
+      width: page.width,
+      height: page.height, // Total rendered height of PDF
+    });
+  }, []);
 
-  const updateField = useCallback(
-    (fieldId, newPixelData) => {
-      setFields((prevFields) =>
-        prevFields.map((field) => {
-          if (field.id === fieldId) {
-            const newRelativeCoords = calculateRelativeCoords(
-              newPixelData,
-              pdfDimensions
-            );
-            return {
-              ...field,
-              ...newRelativeCoords,
-            };
-          }
-          return field;
-        })
-      );
-    },
-    [pdfDimensions]
-  );
+  const updateField = useCallback(
+    (fieldId, newPixelData) => {
+      setFields((prevFields) =>
+        prevFields.map((field) => {
+          if (field.id === fieldId) {
+            const newRelativeCoords = calculateRelativeCoords(
+              newPixelData,
+              pdfDimensions
+            );
+            return {
+              ...field,
+              ...newRelativeCoords,
+            };
+          }
+          return field;
+        })
+      );
+    },
+    [pdfDimensions]
+  );
 
-  const addField = useCallback(
-    (type, initialPixelData) => {
-      const newRelativeCoords = calculateRelativeCoords(
-        initialPixelData,
-        pdfDimensions
-      );
+  const addField = useCallback(
+    (type, initialPixelData) => {
+      const newRelativeCoords = calculateRelativeCoords(
+        initialPixelData,
+        pdfDimensions
+      );
 
-      const newField = {
-        id: `field-${Date.now()}`,
-        type: type,
-        page: 1,
-        ...newRelativeCoords,
-      };
+      const newField = {
+        id: `field-${Date.now()}`,
+        type: type,
+        page: 1,
+        ...newRelativeCoords,
+      };
 
-      setFields((prevFields) => [...prevFields, newField]);
-    },
-    [pdfDimensions]
-  );
+      setFields((prevFields) => [...prevFields, newField]);
+    },
+    [pdfDimensions]
+  );
 
-  const handleDrop = useCallback(
-    (e) => {
-      e.preventDefault();
-      const type = e.dataTransfer.getData("field/type");
-      const pageContainer = pdfContainerRef.current;
-      // Get the parent div which is set to overflow: 'auto' (the scrollable area)
-      const scrollableParent = pageContainer
-        ? pageContainer.parentElement
-        : null;
+  const handleDrop = useCallback(
+    (e) => {
+      e.preventDefault();
+      const type = e.dataTransfer.getData("field/type");
+      const pageContainer = pdfContainerRef.current;
+      // Get the parent div which is set to overflow: 'auto' (the scrollable area)
+      const scrollableParent = pageContainer
+        ? pageContainer.parentElement
+        : null;
 
-      if (!pageContainer || !scrollableParent) {
-        console.error(
-          "PDF Container or Scrollable Parent Ref is missing. Cannot calculate drop coordinates."
-        );
-        return;
-      }
-      const rect = pageContainer.getBoundingClientRect();
+      if (!pageContainer || !scrollableParent) {
+        console.error(
+          "PDF Container or Scrollable Parent Ref is missing. Cannot calculate drop coordinates."
+        );
+        return;
+      }
+      const rect = pageContainer.getBoundingClientRect();
 
-      // CRITICAL FIX FOR RESPONSIVENESS: Capture the current scroll offset
-      const pixelScrollY = scrollableParent.scrollTop;
+      // CRITICAL FIX FOR RESPONSIVENESS: Capture the current scroll offset
+      const pixelScrollY = scrollableParent.scrollTop;
 
-      const initialPixelData = {
-        pixelX: e.clientX - rect.left,
-        // FIX: Add the scroll offset to the drop position.
-        // This converts the viewport-relative position to a document-relative position.
-        pixelY: e.clientY - rect.top + pixelScrollY,
-        pixelWidth: 100, // Default width
-        pixelHeight: 30, // Default height
-      };
+      const initialPixelData = {
+        pixelX: e.clientX - rect.left,
+        // FIX: Add the scroll offset to the drop position. (Already in your code, confirmed correct)
+        pixelY: e.clientY - rect.top + pixelScrollY, 
+        pixelWidth: 100, // Default width
+        pixelHeight: 30, // Default height
+      };
 
-      if (type) {
-        addField(type, initialPixelData);
-      }
-    },
-    [addField]
-  );
+      if (type) {
+        addField(type, initialPixelData);
+      }
+    },
+    [addField]
+  );
 
-  const handleSignDocument = async () => {
-    const signatureField = fields.find((f) => f.type === "Signature");
-    if (!signatureField) {
-      alert("Please place a Signature field on the document first.");
-      return;
-    }
+  const handleSignDocument = async () => {
+    const signatureField = fields.find((f) => f.type === "Signature");
+    if (!signatureField) {
+      alert("Please place a Signature field on the document first.");
+      return;
+    }
 
-    const signatureBase64 = prompt(
-      "Paste your signature image Base64 string here:"
-    );
-    if (!signatureBase64) return;
+    const signatureBase64 = prompt(
+      "Paste your signature image Base64 string here:"
+    );
+    if (!signatureBase64) return;
 
-    const newWindow = window.open("", "_blank");
-    if (newWindow) {
-      newWindow.document.title = "Processing Document...";
-      newWindow.document.body.innerHTML =
-        "<h1>Signing in Progress... Please Wait.</h1>";
-    }
-    const payload = {
-      pdfId: "document-123",
-      signatureBase64: signatureBase64,
-      fieldData: {
-        type: signatureField.type,
-        page: signatureField.page,
-        x: signatureField.x,
-        y: signatureField.y,
-        width: signatureField.width,
-        height: signatureField.height,
-      },
-      signerId: "test@boloforms.com",
-    };
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.title = "Processing Document...";
+      newWindow.document.body.innerHTML =
+        "<h1>Signing in Progress... Please Wait.</h1>";
+    }
+    const payload = {
+      pdfId: "document-123",
+      signatureBase64: signatureBase64,
+      fieldData: {
+        type: signatureField.type,
+        page: signatureField.page,
+        x: signatureField.x,
+        y: signatureField.y,
+        width: signatureField.width,
+        height: signatureField.height,
+      },
+      signerId: "test@boloforms.com",
+    };
 
-    try {
-      // FIX: Use the VITE_API_URL environment variable to connect to the deployed backend
-      const API_URL = `${import.meta.env.VITE_API_URL}/sign-pdf`;
+    try {
+        // FIX FOR SYNTAX ERROR: Safely define the base URL variable here.
+        // This is necessary because import.meta is not always available at the global scope.
+        // Also includes fallback for safer local debugging.
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const API_URL = `${API_BASE_URL}/sign-pdf`;
+        
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (newWindow) newWindow.close(); // Close placeholder window on API failure
+        throw new Error(
+          `API failed with status ${response.status}: ${errorText}`
+        );
+      }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (newWindow) newWindow.close(); // Close placeholder window on API failure
-        throw new Error(
-          `API failed with status ${response.status}: ${errorText}`
-        );
-      }
+      const data = await response.json();
+      if (newWindow) {
+        newWindow.location.href = data.url;
+        newWindow.document.title = "Signed Document";
+      } else {
+        // Fallback (for older browsers/edge cases)
+        window.open(data.url, "_blank");
+      }
+      alert(`Document Signed! Original Hash: ${data.originalHash}`);
+    } catch (error) {
+      console.error("Submission failed:", error);
+      alert(`Submission failed: ${error.message}`);
+      if (newWindow) newWindow.close();
+    }
+  };
 
-      const data = await response.json();
-      if (newWindow) {
-        newWindow.location.href = data.url;
-        newWindow.document.title = "Signed Document";
-      } else {
-        // Fallback (for older browsers/edge cases)
-        window.open(data.url, "_blank");
-      }
-      alert(`Document Signed! Original Hash: ${data.originalHash}`);
-    } catch (error) {
-      console.error("Submission failed:", error);
-      alert(`Submission failed: ${error.message}`);
-      if (newWindow) newWindow.close();
-    }
-  };
-
-  return (
-    <div
-      className="editor-container"
-      style={{ display: "flex", height: "100vh" }}
-    >
-                  <Sidebar onDropField={addField} />                       {" "}
-      <div
-        style={{ flexGrow: 1, overflow: "auto" }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-                       {" "}
-        <PdfViewer
-          pdfContainerRef={pdfContainerRef}
-          onLoadSuccess={handlePdfLoadSuccess}
-          fields={fields}
-          pdfDimensions={pdfDimensions}
-          onFieldUpdate={updateField}
-        />
-                   {" "}
-      </div>
-                         {" "}
-      <button
-        onClick={handleSignDocument}
-        style={{
-          position: "fixed",
-          bottom: 20,
-          right: 20,
-          padding: "12px 25px",
-          background: "#4CAF50",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-          fontWeight: "bold",
-          zIndex: 100, // Ensure button is on top
-        }}
-      >
-                        SIGN & SUBMIT DOCUMENT            {" "}
-      </button>
-             {" "}
-    </div>
-  );
+  return (
+    <div
+      className="editor-container"
+      style={{ display: "flex", height: "100vh" }}
+    >
+      <Sidebar onDropField={addField} />
+      <div
+        style={{ flexGrow: 1, overflow: "auto" }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
+      >
+        <PdfViewer
+          pdfContainerRef={pdfContainerRef}
+          onLoadSuccess={handlePdfLoadSuccess}
+          fields={fields}
+          pdfDimensions={pdfDimensions}
+          onFieldUpdate={updateField}
+        />
+      </div>
+      <button
+        onClick={handleSignDocument}
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          padding: "12px 25px",
+          background: "#4CAF50",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+          fontWeight: "bold",
+          zIndex: 100, // Ensure button is on top
+        }}
+      >
+        SIGN & SUBMIT DOCUMENT
+      </button>
+    </div>
+  );
 }
