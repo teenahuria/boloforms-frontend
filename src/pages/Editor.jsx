@@ -158,7 +158,9 @@ export default function Editor() {
         // We must use import.meta.env.VITE_API_URL to match the variable correctly set on Render.
         // We also ensure the obsolete process.env.REACT_APP_API_URL (which was incorrectly set) is not used.
         
-        const API_BASE_URL = import.meta.env.VITE_API_URL;
+        // New (Final, Correct Syntax)
+// Use the standard process.env.REACT_APP_ prefix
+const API_BASE_URL = process.env.REACT_APP_API_URL;
         
         if (!API_BASE_URL) {
             // This check prevents the browser from trying to call an undefined address.
